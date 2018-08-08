@@ -46,9 +46,22 @@ testrepo () {
     exit 1
   fi
 
-  # Check tests
+
+  wget https://github.com/git-lfs/git-lfs/releases/download/v2.5.0/git-lfs-linux-amd64-v2.5.0.tar.gz
+  tar xvf git-lfs-linux-amd64-v2.5.0.tar.gz
+  ./git-lfs install
+
+  git clone https://github.com/JFixby/dcrdata-testdata-gitlfs db/dcrsqlite/dcrdata-testdata
+   cd db/dcrsqlite/dcrdata-testdata/synced_up_to_260241
+   tar xvf test-data.tar.xz
+   cd ..
+   cd ..
+   cd ..
+   cd ..
+
   git clone https://github.com/dcrlabs/bug-free-happiness test-data-repo
-  tar xvf test-data-repo/stakedb/test_ticket_pool.bdgr.tar.xz
+   tar xvf test-data-repo/stakedb/test_ticket_pool.bdgr.tar.xz
+
 
   env GORACE='halt_on_error=1' go test -v -race ./...
   if [ $? != 0 ]; then

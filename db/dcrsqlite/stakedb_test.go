@@ -29,7 +29,7 @@ func TestStakeDB(t *testing.T) {
 	bestNode := produceGenesisNode(params)
 
 	// test
-	for i := 0; i <= 5000; i++ {
+	for i := firstBlockIndex; i <= lastBlockIndex; i++ {
 		index := int64(i)
 		block := testBlockchain[index]
 		bestNode = connectBlock(block, bestNode, testBlockchain, params)

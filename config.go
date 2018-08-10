@@ -14,7 +14,7 @@ import (
 	"sort"
 	"strings"
 
-	flags "github.com/btcsuite/go-flags"
+	"github.com/btcsuite/go-flags"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/dcrutil"
 	"github.com/decred/dcrd/wire"
@@ -277,6 +277,7 @@ func loadConfig() (*config, error) {
 	// file or the version flag was specified.
 	preCfg := cfg
 	preParser := flags.NewParser(&preCfg, flags.HelpFlag|flags.PassDoubleDash)
+	preParser.Options = flags.IgnoreUnknown
 	_, err := preParser.Parse()
 	if err != nil {
 		e, ok := err.(*flags.Error)
@@ -304,6 +305,7 @@ func loadConfig() (*config, error) {
 	// Config file name for logging.
 	configFile := "NONE (defaults)"
 	parser := flags.NewParser(&cfg, flags.Default)
+	parser.Options = flags.IgnoreUnknown
 	if _, err := os.Stat(preCfg.ConfigFile); os.IsNotExist(err) {
 		// Non-default config file must exist
 		if defaultConfig.ConfigFile != preCfg.ConfigFile {

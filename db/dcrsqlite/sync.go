@@ -89,7 +89,8 @@ func (db *wiredDB) resyncDB(quit chan struct{}, blockGetter rpcutils.BlockGetter
 	fetchToHeight int64) (int64, error) {
 	// Determine if we're in lite mode, when we are the "master" who sets the
 	// pace rather than waiting on other consumers to get done with the stakedb.
-	master := blockGetter == nil || blockGetter.(*rpcutils.BlockGate) == nil
+	//master := blockGetter == nil || blockGetter.(*rpcutils.BlockGate) == nil
+	master := false
 
 	// Get chain servers's best block
 	_, height, err := db.client.GetBestBlock()

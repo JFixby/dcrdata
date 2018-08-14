@@ -24,6 +24,7 @@ import (
 	"github.com/decred/dcrdata/rpcutils"
 	"github.com/decred/dcrdata/txhelpers"
 	"github.com/oleiade/lane"
+	"github.com/decred/dcrdata/testutil"
 )
 
 // PoolInfoCache contains a map of block hashes to ticket pool info data at that
@@ -482,17 +483,23 @@ func (db *StakeDatabase) ConnectBlock(block *dcrutil.Block) error {
 	height := block.Height()
 	maturingHeight := height - int64(db.params.TicketMaturity)
 
+	testutil.Log("ConnectBlock:", block.MsgBlock().Header.Height)
+
+	blockCache := make(map[int64]*dcrutil.Block)
+
 	var maturingTickets []chainhash.Hash
 	if maturingHeight >= 0 {
 		maturingBlock, wasCached := db.block(maturingHeight)
 		if wasCached {
 			db.ForgetBlock(maturingHeight)
 		}
+
 		maturingTickets, _ = txhelpers.TicketsInBlock(maturingBlock)
 	}
 
 	db.blkMtx.Lock()
 	db.blockCache[height] = block
+	blockCache[height] = block
 	db.blkMtx.Unlock()
 
 	revokedTickets := txhelpers.RevokedTicketsInBlock(block)
@@ -551,8 +558,72 @@ func (db *StakeDatabase) ConnectBlock(block *dcrutil.Block) error {
 	pib := db.makePoolInfo(db.poolValue, poolSize, winningTickets, uint32(height))
 	db.poolInfo.Set(*block.Hash(), pib)
 
+	checkBlock(block, blockCache, db.params, db.NodeClient)
+
 	// Append this ticket pool diff
 	return db.PoolDB.Append(poolDiff, bestNodeHeight+1)
+}
+func checkBlock(block *dcrutil.Block, blockCache map[int64]*dcrutil.Block, params *chaincfg.Params, nodeClient *rpcclient.Client) {
+	m, r, v := getBlockTickets(block, blockCache, params, nodeClient)
+	block.Bytes()
+	sm, sr, sv := getBlockTickets(block, blockCache, params, nodeClient)
+
+	em := equals(m, sm)
+	er := equals(r, sr)
+	ev := equals(v, sv)
+
+	if !em {
+		testutil.Log("m", m)
+		testutil.Log("sm", sm)
+	}
+
+	if !er {
+		testutil.Log("r", r)
+		testutil.Log("sr", sr)
+	}
+
+	if !ev {
+		testutil.Log("v", v)
+		testutil.Log("sv", sv)
+	}
+}
+func equals(x []chainhash.Hash, y []chainhash.Hash) bool {
+	if len(x) != len(y) {
+		return false
+	}
+	for i, v := range x {
+		if v != y[i] {
+			return false
+		}
+	}
+	return true
+}
+func getBlockTickets(
+	block *dcrutil.Block, blockCache map[int64]*dcrutil.Block, params *chaincfg.Params, nodeClient *rpcclient.Client) (
+	[]chainhash.Hash, []chainhash.Hash, []chainhash.Hash) {
+	height := block.Height()
+	maturingHeight := height - int64(params.TicketMaturity)
+
+	var maturingTickets []chainhash.Hash
+	if maturingHeight >= 0 {
+		maturingBlock := blockCache[maturingHeight]
+		if maturingBlock == nil {
+			testutil.Log("missing block", maturingHeight)
+			var err error = nil
+			maturingBlock, _, err = rpcutils.GetBlock(maturingHeight, nodeClient)
+			if err != nil {
+				log.Error(err)
+				panic("")
+			}
+
+		}
+		maturingTickets, _ = txhelpers.TicketsInBlock(maturingBlock)
+	}
+
+	revokedTickets := txhelpers.RevokedTicketsInBlock(block)
+	votedTickets := txhelpers.TicketsSpentInBlock(block)
+
+	return maturingTickets, revokedTickets, votedTickets
 }
 
 func (db *StakeDatabase) connectBlock(block *dcrutil.Block, spent []chainhash.Hash,

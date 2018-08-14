@@ -25,6 +25,8 @@ func TestStakeDB(t *testing.T) {
 	//load blocks
 	testBlockchain := testutil.PreLoadBlocks(tag, firstBlockIndex, lastBlockIndex)
 
+	listBlock(667, testBlockchain)
+
 	params := &chaincfg.MainNetParams
 	bestNode := produceGenesisNode(params)
 
@@ -35,6 +37,15 @@ func TestStakeDB(t *testing.T) {
 		bestNode = connectBlock(block, bestNode, testBlockchain, params)
 	}
 
+}
+func listBlock(i int64, blocks map[int64]*dcrutil.Block) {
+	//a10547a4bcb59914e85d747a1acb971f2f989b9a0600ec5c4d60d6a58a679dc8
+	b := blocks[i]
+
+	maturingTickets, _ := txhelpers.TicketsInBlock(b)
+
+	testutil.Log("block", i)
+	testutil.Log("maturingTickets", maturingTickets)
 }
 func produceGenesisNode(params *chaincfg.Params) *stake.Node {
 	testName := testutil.TestName()
@@ -74,6 +85,8 @@ func connectBlock(
 	if maturingHeight >= 0 {
 		maturingBlock := blockCache[maturingHeight]
 		maturingTickets, _ = txhelpers.TicketsInBlock(maturingBlock)
+		testutil.Log("maturingHeight", maturingHeight)
+		testutil.Log("maturingTickets", maturingTickets)
 	}
 
 	revokedTickets := txhelpers.RevokedTicketsInBlock(block)

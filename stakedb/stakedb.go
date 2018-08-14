@@ -25,6 +25,8 @@ import (
 	"github.com/decred/dcrdata/txhelpers"
 	"github.com/oleiade/lane"
 	"github.com/decred/dcrdata/testutil"
+	"reflect"
+	"github.com/davecgh/go-spew/spew"
 )
 
 // PoolInfoCache contains a map of block hashes to ticket pool info data at that
@@ -483,9 +485,26 @@ func (db *StakeDatabase) ConnectBlock(block *dcrutil.Block) error {
 	height := block.Height()
 	maturingHeight := height - int64(db.params.TicketMaturity)
 
-	testutil.Log("ConnectBlock:", block.MsgBlock().Header.Height)
-
 	blockCache := make(map[int64]*dcrutil.Block)
+	{
+		//data, err := block.Bytes()
+		//if err != nil {
+		//	panic("")
+		//}
+		//var msgBlock wire.MsgBlock
+		//err = msgBlock.Deserialize(bytes.NewReader(data))
+		//if err != nil {
+		//	panic("")
+		//}
+		//block2 := dcrutil.NewBlock(&msgBlock)
+		//
+		//compareBlocks(block, block2)
+		//checkBlock
+		checkBlock(block, blockCache, db.params, db.NodeClient)
+
+	}
+
+	testutil.Log("ConnectBlock:", block.MsgBlock().Header.Height)
 
 	var maturingTickets []chainhash.Hash
 	if maturingHeight >= 0 {
@@ -558,15 +577,72 @@ func (db *StakeDatabase) ConnectBlock(block *dcrutil.Block) error {
 	pib := db.makePoolInfo(db.poolValue, poolSize, winningTickets, uint32(height))
 	db.poolInfo.Set(*block.Hash(), pib)
 
-	checkBlock(block, blockCache, db.params, db.NodeClient)
+	//checkBlock(block, blockCache, db.params, db.NodeClient)
 
 	// Append this ticket pool diff
 	return db.PoolDB.Append(poolDiff, bestNodeHeight+1)
 }
+func compareBlocks(x *dcrutil.Block, y *dcrutil.Block) {
+	a := x
+	b := y
+	if !reflect.DeepEqual(a, b) {
+
+		//testutil.Log("cmp", cmp.Diff(a, b))
+
+		sa := spew.Sdump(a)
+		sb := spew.Sdump(b)
+		testutil.Log("a", sa)
+		testutil.Log("b", sb)
+
+		Aa := strings.Split(sa, "\n")
+		Ab := strings.Split(sb, "\n")
+
+		N := max(len(Aa), len(Ab))
+
+		for i := 0; i < N; i++ {
+			ca := valAt(Aa, i)
+			cb := valAt(Ab, i)
+			if len(ca) == len(cb) && ca != "#" {
+				fmt.Println(ca)
+			} else {
+				fmt.Println(">>>>>> " + ca)
+				fmt.Println("<<<<<< " + cb)
+				spew.Sdump(a)
+			}
+		}
+
+	}
+}
+func valAt(Ab []string, i int) string {
+	if i < len(Ab) {
+		return string(Ab[i])
+	}
+	return "#"
+}
+
+func max(x, y int) int {
+	if x > y {
+		return x
+	}
+	return y
+}
+
 func checkBlock(block *dcrutil.Block, blockCache map[int64]*dcrutil.Block, params *chaincfg.Params, nodeClient *rpcclient.Client) {
 	m, r, v := getBlockTickets(block, blockCache, params, nodeClient)
-	block.Bytes()
-	sm, sr, sv := getBlockTickets(block, blockCache, params, nodeClient)
+
+	data, err := block.Bytes()
+	if err != nil {
+		panic("")
+	}
+
+	block2, _ := dcrutil.NewBlockFromBytes(data)
+
+	compareBlocks(block, block2)
+	if (1 == 1) {
+		return
+	}
+
+	sm, sr, sv := getBlockTickets(block2, blockCache, params, nodeClient)
 
 	em := equals(m, sm)
 	er := equals(r, sr)
@@ -575,16 +651,19 @@ func checkBlock(block *dcrutil.Block, blockCache map[int64]*dcrutil.Block, param
 	if !em {
 		testutil.Log("m", m)
 		testutil.Log("sm", sm)
+		panic("")
 	}
 
 	if !er {
 		testutil.Log("r", r)
 		testutil.Log("sr", sr)
+		panic("")
 	}
 
 	if !ev {
 		testutil.Log("v", v)
 		testutil.Log("sv", sv)
+		panic("")
 	}
 }
 func equals(x []chainhash.Hash, y []chainhash.Hash) bool {

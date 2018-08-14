@@ -1,7 +1,6 @@
 package testutil
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -9,7 +8,6 @@ import (
 	"strconv"
 
 	"github.com/decred/dcrd/dcrutil"
-	"github.com/decred/dcrd/wire"
 )
 
 // BlockFilename generates file name for a Block
@@ -69,12 +67,14 @@ func ReadBlock(file string) (*dcrutil.Block, error) {
 		return nil, err
 	}
 
-	var msgBlock wire.MsgBlock
-	err = msgBlock.Deserialize(bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-	block := dcrutil.NewBlock(&msgBlock)
+	//var msgBlock wire.MsgBlock
+	//err = msgBlock.Deserialize(bytes.NewReader(data))
+	//if err != nil {
+	//	return nil, err
+	//}
+	//block := dcrutil.NewBlock(&msgBlock)
+
+	block, _ := dcrutil.NewBlockFromBytes(data)
 
 	return block, nil
 }

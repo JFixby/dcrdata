@@ -221,9 +221,9 @@ func serveFutureBlockInfo(w http.ResponseWriter, r *http.Request, exp *explorerU
 	exp.MempoolData.RUnlock()
 
 	blocksLeft := blockIndex - bestBlock
-	timestamp := time.Now().Unix() // seconds
-	targetBlockTime := blocksLeft * int64(exp.ChainParams.TargetTimePerBlock.Seconds())
-	timestamp = timestamp + targetBlockTime
+	targetBlockTime := int64(exp.ChainParams.TargetTimePerBlock.Seconds())
+	timestamp := time.Now().Unix() + targetBlockTime*blocksLeft // seconds
+	//timestamp =  targetBlockTime
 
 	data := &BlockInfo{
 		BlockBasic: &BlockBasic{
@@ -240,7 +240,6 @@ func serveFutureBlockInfo(w http.ResponseWriter, r *http.Request, exp *explorerU
 	}
 
 	data.BlockBasic.Height = blockIndex
-	serveBlockInfo(w, r, exp, data)
 
 	pageData := BlockPageData{
 		Data:          data,
@@ -318,8 +317,8 @@ func (exp *explorerUI) TxPage(w http.ResponseWriter, r *http.Request) {
 		tx.TicketInfo.TicketExpiry = int64(exp.ChainParams.TicketExpiry)
 		expirationInDays := (exp.ChainParams.TargetTimePerBlock.Hours() *
 			float64(exp.ChainParams.TicketExpiry)) / 24
-		maturityInHours := (exp.ChainParams.TargetTimePerBlock.Hours() *
-			float64(tx.TicketInfo.TicketMaturity))
+		maturityInHours := exp.ChainParams.TargetTimePerBlock.Hours() *
+			float64(tx.TicketInfo.TicketMaturity)
 		tx.TicketInfo.TimeTillMaturity = ((float64(exp.ChainParams.TicketMaturity) -
 			float64(tx.Confirmations)) / float64(exp.ChainParams.TicketMaturity)) * maturityInHours
 		ticketExpiryBlocksLeft := int64(exp.ChainParams.TicketExpiry) - blocksLive

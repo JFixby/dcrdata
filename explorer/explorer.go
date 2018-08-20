@@ -222,7 +222,7 @@ func New(dataSource explorerDataSourceLite, primaryDataSource explorerDataSource
 		"home",
 		"explorer",
 		"mempool",
-		"block",
+		//"block",
 		//"future-block",
 		"tx",
 		"address",

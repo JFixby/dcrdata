@@ -51,9 +51,9 @@
                     </tr>
                     {{else}}
                     <tr>
-                        <td class="text-right pr-2 lh1rem vam nowrap"><a href="/mempool">NEXT BLOCK</a></td>
+                        <td class="text-right pr-2 lh1rem vam nowrap"><a data-preserve-keynav-index="true" href="/block/{{.NextBlock}}">NEXT BLOCK</a></td>
                         <td>
-                            <span class="lh1rem">mempool</span>
+                            <span class="hash break-word lh1rem">{{.NextBlock}}</span>
                         </td>
                     </tr>
                     {{end}}

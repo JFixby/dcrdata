@@ -218,14 +218,27 @@ func New(dataSource explorerDataSourceLite, primaryDataSource explorerDataSource
 		log.Errorf("Unable to create new html template: %v", err)
 		return nil
 	}
-	tmpls := []string{"home", "explorer", "mempool", "block", "tx", "address",
-		"rawtx", "status", "parameters", "agenda", "agendas", "charts"}
+	preLoadedTemplates := []string{
+		"home",
+		"explorer",
+		"mempool",
+		"block",
+		//"future-block",
+		"tx",
+		"address",
+		"rawtx",
+		"status",
+		"parameters",
+		"agenda",
+		"agendas",
+		"charts",
+	}
 
 	tempDefaults := []string{"extras"}
 
 	exp.templates = newTemplates("views", tempDefaults, makeTemplateFuncMap(exp.ChainParams))
 
-	for _, name := range tmpls {
+	for _, name := range preLoadedTemplates {
 		if err := exp.templates.addTemplate(name); err != nil {
 			return noTemplateError(err)
 		}

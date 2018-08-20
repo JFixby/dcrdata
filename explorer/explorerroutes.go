@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"io"
 	"math"
+	"time"
 	"net/http"
 	"sort"
 	"strconv"
@@ -123,14 +124,55 @@ func (exp *explorerUI) Blocks(w http.ResponseWriter, r *http.Request) {
 
 // Block is the page handler for the "/block" path
 func (exp *explorerUI) Block(w http.ResponseWriter, r *http.Request) {
-	hash := getBlockHashCtx(r)
 
-	data := exp.blockData.GetExplorerBlock(hash)
+	{ // try with the provided block hash
+		blockHash := getBlockHashCtx(r)
+
+		if blockHash != "" {
+			data := exp.blockData.GetExplorerBlock(blockHash)
+			if data == nil {
+				log.Errorf("Unable to get block %s", blockHash)
+				exp.StatusPage(w, defaultErrorCode, "could not find that block", NotFoundStatusType)
+				return //failed, report
+			}
+			serveBlockInfo(w, r, exp, data)
+			return
+		}
+	}
+
+	// try with the block index
+	blockIndex := getBlockHeightCtx(r)
+
+	if blockIndex < 0 {
+		log.Errorf("Unable to get block %s", blockIndex)
+		exp.StatusPage(w, defaultErrorCode, "could not find that block", NotFoundStatusType)
+		return //failed, report
+	}
+
+	blockHash, err := exp.blockData.GetBlockHash(blockIndex)
+	if err != nil {
+		if !AllowFutureBlocks {
+			log.Errorf("Unable to get block %s", blockIndex)
+			exp.StatusPage(w, defaultErrorCode, "could not find that block", NotFoundStatusType)
+			return
+		}
+		// seems like this is a future block
+		serveFutureBlockInfo(w, r, exp, blockIndex)
+		return
+	}
+
+	data := exp.blockData.GetExplorerBlock(blockHash)
 	if data == nil {
-		log.Errorf("Unable to get block %s", hash)
+		log.Errorf("Unable to get block %s", blockIndex)
 		exp.StatusPage(w, defaultErrorCode, "could not find that block", NotFoundStatusType)
 		return
 	}
+
+	serveBlockInfo(w, r, exp, data)
+}
+
+func serveBlockInfo(w http.ResponseWriter, r *http.Request, exp *explorerUI, data *BlockInfo) {
+	hash := data.Hash
 	// Checking if there exists any regular non-Coinbase transactions in the block.
 	var count int
 	data.TxAvailable = true
@@ -151,18 +193,15 @@ func (exp *explorerUI) Block(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	pageData := struct {
-		Data          *BlockInfo
-		ConfirmHeight int64
-		Version       string
-		NetName       string
-	}{
-		data,
-		exp.NewBlockData.Height - data.Confirmations,
-		exp.Version,
-		exp.NetName,
+	pageData := BlockPageData{
+		Data:          data,
+		ConfirmHeight: exp.NewBlockData.Height - data.Confirmations,
+		Version:       exp.Version,
+		NetName:       exp.NetName,
 	}
-	str, err := exp.templates.execTemplateToString("block", pageData)
+
+	template := "block"
+	str, err := exp.templates.execTemplateToString(template, pageData)
 	if err != nil {
 		log.Errorf("Template execute failure: %v", err)
 		exp.StatusPage(w, defaultErrorCode, defaultErrorMessage, ErrorStatusType)
@@ -172,6 +211,63 @@ func (exp *explorerUI) Block(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Turbolinks-Location", r.URL.RequestURI())
 	w.WriteHeader(http.StatusOK)
 	io.WriteString(w, str)
+
+}
+
+func serveFutureBlockInfo(w http.ResponseWriter, r *http.Request, exp *explorerUI, blockIndex int64) {
+	exp.MempoolData.RLock()
+	spending := exp.MempoolData.TotalOut
+	bestBlock := int64(exp.blockData.GetHeight())
+	exp.MempoolData.RUnlock()
+
+	blocksLeft := blockIndex - bestBlock
+	timestamp := time.Now().Unix() // seconds
+	targetBlockTime := blocksLeft * int64(exp.ChainParams.TargetTimePerBlock.Seconds())
+	timestamp = timestamp + targetBlockTime
+
+	data := &BlockInfo{
+		BlockBasic: &BlockBasic{
+			BlockTime: timestamp,
+		},
+		Votes:         make([]*TxBasic, 0),
+		Revs:          make([]*TxBasic, 0),
+		Tickets:       make([]*TxBasic, 0),
+		Tx:            make([]*TxBasic, 0),
+		PreviousBlock: blockIndex - 1,
+		NextBlock:     blockIndex + 1,
+		Confirmations: blocksLeft,
+		TotalSent:     spending,
+	}
+
+	data.BlockBasic.Height = blockIndex
+	serveBlockInfo(w, r, exp, data)
+
+	pageData := BlockPageData{
+		Data:          data,
+		ConfirmHeight: exp.NewBlockData.Height - data.Confirmations,
+		Version:       exp.Version,
+		NetName:       exp.NetName,
+		IsFutureBlock: true,
+	}
+	template := "future-block"
+	str, err := exp.templates.execTemplateToString(template, pageData)
+	if err != nil {
+		log.Errorf("Template execute failure: %v", err)
+		exp.StatusPage(w, defaultErrorCode, defaultErrorMessage, ErrorStatusType)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html")
+	w.Header().Set("Turbolinks-Location", r.URL.RequestURI())
+	w.WriteHeader(http.StatusOK)
+	io.WriteString(w, str)
+}
+
+type BlockPageData struct {
+	Data          *BlockInfo
+	ConfirmHeight int64
+	Version       string
+	NetName       string
+	IsFutureBlock bool
 }
 
 // Mempool is the page handler for the "/mempool" path
@@ -277,7 +373,7 @@ func (exp *explorerUI) TxPage(w http.ResponseWriter, r *http.Request) {
 					// Blocks from eligible until voted (actual luck)
 					tx.TicketInfo.TicketLiveBlocks = exp.blockData.TxHeight(tx.SpendingTxns[0].Hash) -
 						tx.BlockHeight - int64(exp.ChainParams.TicketMaturity) - 1
-				} else if tx.Confirmations >= int64(exp.ChainParams.TicketExpiry+
+				} else if tx.Confirmations >= int64(exp.ChainParams.TicketExpiry +
 					uint32(exp.ChainParams.TicketMaturity)) { // Expired
 					// Blocks ticket was active before expiring (actual no luck)
 					tx.TicketInfo.TicketLiveBlocks = int64(exp.ChainParams.TicketExpiry)
@@ -667,6 +763,7 @@ func (exp *explorerUI) Charts(w http.ResponseWriter, r *http.Request) {
 // redirects to the appropriate page or displays an error
 func (exp *explorerUI) Search(w http.ResponseWriter, r *http.Request) {
 	searchStr := r.URL.Query().Get("search")
+	searchStr = strings.Replace(searchStr, " ", "", -1) // remove spaces
 	if searchStr == "" {
 		exp.StatusPage(w, "search failed", "Nothing was searched for", NotFoundStatusType)
 		return
@@ -674,14 +771,9 @@ func (exp *explorerUI) Search(w http.ResponseWriter, r *http.Request) {
 
 	// Attempt to get a block hash by calling GetBlockHash to see if the value
 	// is a block index and then redirect to the block page if it is
-	idx, err := strconv.ParseInt(searchStr, 10, 0)
+	_, err := strconv.ParseInt(searchStr, 10, 0)
 	if err == nil {
-		_, err = exp.blockData.GetBlockHash(idx)
-		if err == nil {
-			http.Redirect(w, r, "/block/"+searchStr, http.StatusPermanentRedirect)
-			return
-		}
-		exp.StatusPage(w, "search failed", "Block "+searchStr+" has not yet been mined", NotFoundStatusType)
+		http.Redirect(w, r, "/block/"+searchStr, http.StatusPermanentRedirect)
 		return
 	}
 

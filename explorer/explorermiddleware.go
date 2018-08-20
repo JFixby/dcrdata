@@ -13,8 +13,13 @@ import (
 
 type contextKey int
 
+// AllowFutureBlocks signals if instead of an error, for any block numbers that
+// are ahead of the current height, we should display a page which says
+// the block is not available yet.
+var AllowFutureBlocks = true
+
 const (
-	ctxSearch contextKey = iota
+	ctxSearch     contextKey = iota
 	ctxBlockIndex
 	ctxBlockHash
 	ctxTxHash
@@ -24,29 +29,43 @@ const (
 
 func (exp *explorerUI) BlockHashPathOrIndexCtx(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		height, err := strconv.ParseInt(chi.URLParam(r, "blockhash"), 10, 0)
-		var hash string
+		blockHashOrIndex := chi.URLParam(r, "blockhash")
+
+		// Is it a block index? Let's check.
+		blockIndex := tryExtractBlockIndex(blockHashOrIndex)
+		if blockIndex != -1 {
+			// Yes it is the block index.
+			// Serve block by the index.
+			ctx := context.WithValue(r.Context(), ctxBlockIndex, blockIndex)
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+		// This is not a block index.
+
+		// Is it a block hash? Let's check.
+		_, err := exp.blockData.GetBlockHeight(blockHashOrIndex)
 		if err != nil {
-			hash = chi.URLParam(r, "blockhash")
-			height, err = exp.blockData.GetBlockHeight(hash)
-			if err != nil {
-				log.Errorf("GetBlockHeight(%s) failed: %v", hash, err)
-				exp.StatusPage(w, defaultErrorCode, "could not find that block", NotFoundStatusType)
-				return
-			}
-		} else {
-			hash, err = exp.blockData.GetBlockHash(height)
-			if err != nil {
-				log.Errorf("GetBlockHeight(%d) failed: %v", height, err)
-				exp.StatusPage(w, defaultErrorCode, "could not find that block", NotFoundStatusType)
-				return
-			}
+			// No it is not a valid block hash, also it is not a valid index. Report.
+			log.Errorf("GetBlockHeight(%s) failed: %v", blockHashOrIndex, err)
+			exp.StatusPage(w, defaultErrorCode, "could not find that block", NotFoundStatusType)
+			return
 		}
 
+		// Yes it is the block hash.
+		hash := blockHashOrIndex
+
+		// Serve block by the hash.
 		ctx := context.WithValue(r.Context(), ctxBlockHash, hash)
-		ctx = context.WithValue(ctx, ctxBlockIndex, height)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func tryExtractBlockIndex(blockHashOrHeight string) int64 {
+	height, err := strconv.ParseInt(blockHashOrHeight, 10, 0)
+	if err != nil { // this is not height
+		return -1
+	}
+	return height
 }
 
 func getBlockHashCtx(r *http.Request) string {
@@ -59,8 +78,7 @@ func getBlockHashCtx(r *http.Request) string {
 }
 
 func getBlockHeightCtx(r *http.Request) int64 {
-	idxI, ok := r.Context().Value(ctxBlockIndex).(int)
-	idx := int64(idxI)
+	idx, ok := r.Context().Value(ctxBlockIndex).(int64)
 	if !ok {
 		log.Trace("Block Height not set")
 		return -1

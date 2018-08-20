@@ -78,12 +78,30 @@ func (t *templates) reloadTemplates() error {
 func (t *templates) execTemplateToString(name string, data interface{}) (string, error) {
 	temp, ok := t.templates[name]
 	if !ok {
-		return "", fmt.Errorf("Template %s not known", name)
+		//return "", fmt.Errorf("Template %s not known", name)
+		tempPointer, err := tryToLoadTemplateOnFly(t, name)
+		if err != nil {
+			return "", err
+		}
+		temp = *tempPointer
 	}
 
 	var page bytes.Buffer
 	err := temp.template.ExecuteTemplate(&page, name, data)
 	return page.String(), err
+}
+
+func tryToLoadTemplateOnFly(t *templates, name string) (*pageTemplate, error) {
+	fileName := filepath.Join(t.folder, name+".tmpl")
+	files := append(t.defaults, fileName)
+	temp, err := template.New(name).Funcs(t.helpers).ParseFiles(files...)
+	if err == nil {
+		return &pageTemplate{
+			file:     fileName,
+			template: temp,
+		}, nil
+	}
+	return nil, err
 }
 
 var toInt64 = func(v interface{}) int64 {

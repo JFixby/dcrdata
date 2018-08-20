@@ -1032,6 +1032,8 @@ func (db *wiredDB) GetExplorerBlock(hash string) *explorer.BlockInfo {
 		StakeVersion:          data.StakeVersion,
 		PreviousHash:          data.PreviousHash,
 		NextHash:              data.NextHash,
+		NextBlock:             data.Height + 1,
+		PreviousBlock:         data.Height - 1,
 		StakeValidationHeight: db.params.StakeValidationHeight,
 	}
 

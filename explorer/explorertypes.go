@@ -30,14 +30,17 @@ const (
 
 // BlockBasic models data for the explorer's explorer page
 type BlockBasic struct {
-	Height         int64  `json:"height"`
-	Size           int32  `json:"size"`
-	Valid          bool   `json:"valid"`
-	Voters         uint16 `json:"votes"`
-	Transactions   int    `json:"tx"`
-	FreshStake     uint8  `json:"tickets"`
-	Revocations    uint32 `json:"revocations"`
-	BlockTime      int64  `json:"time"`
+	Height       int64  `json:"height"`
+	Size         int32  `json:"size"`
+	Valid        bool   `json:"valid"`
+	Voters       uint16 `json:"votes"`
+	Transactions int    `json:"tx"`
+	FreshStake   uint8  `json:"tickets"`
+	Revocations  uint32 `json:"revocations"`
+
+	//BlockTime is the number of seconds elapsed since January 1, 1970 UTC.
+	BlockTime int64 `json:"time"`
+
 	FormattedTime  string `json:"formatted_time"`
 	FormattedBytes string `json:"formatted_bytes"`
 }
@@ -205,6 +208,8 @@ type BlockInfo struct {
 	StakeVersion          uint32
 	PreviousHash          string
 	NextHash              string
+	PreviousBlock         int64
+	NextBlock             int64
 	TotalSent             float64
 	MiningFee             dcrutil.Amount
 	StakeValidationHeight int64

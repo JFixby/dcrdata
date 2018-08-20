@@ -1,0 +1,86 @@
+{{define "future-block"}}
+<!DOCTYPE html>
+<html lang="en">
+{{template "html-head" printf "Decred Block %d" .Data.Height}}
+<body>
+    {{ template "navbar" . }}
+    <div class="container" data-controller="main">
+    {{with .Data}}
+        <div class="row justify-content-between">
+            <div class="col-md-7 col-sm-6">
+                <h4 class="mb-2">
+                    Block #{{.Height}} {{ if gt .Confirmations 1 }}
+                        <span class="op60 fs12">( <span data-confirmation-block-height="{{$.ConfirmHeight}}">{{.Confirmations}}</span> blocks to mine)</span>
+                    {{else}}
+                        <span class="op60 fs12"><a href="/mempool">mining</a></span>
+                    {{end}}
+                </h4>
+            </div>
+            <div class="col-md-5 col-sm-6 d-flex">
+            {{ if eq .Confirmations 1 }}
+                <table>
+                    <tr class="h2rem">
+                        <td class="pr-2 lh1rem vam text-right xs-w117 w120">TOTAL SENT</td>
+                        <td class="fs28 mono fs16-decimal d-flex align-items-center">{{template "decimalParts" (float64AsDecimalParts .TotalSent false)}}<span class="pl-1 unit">DCR</span></td>
+                    </tr>
+                </table>
+            {{end}}
+            </div>
+        </div>
+
+        <div class="row justify-content-between">
+            <div class="col-md-7 col-sm-6 d-flex">
+                <table class="">
+                    <tr>
+                        <td class="text-right pr-2 lh1rem vam nowrap xs-w117">BLOCK HASH</td>
+                        <td>
+                            <span class="hash break-word lh1rem">(not mined yet)</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-right pr-2 lh1rem vam nowrap"><a data-keynav-priority href="/block/{{.PreviousBlock}}">PREV BLOCK</a></td>
+                        <td>
+                            <span class="hash break-word lh1rem">{{.PreviousBlock}}</span>
+                        </td>
+                    </tr>
+                    {{if .NextHash}}
+                    <tr>
+                        <td class="text-right pr-2 lh1rem vam nowrap"><a data-preserve-keynav-index="true" href="/block/{{.NextHash}}">NEXT BLOCK</a></td>
+                        <td>
+                            <span class="hash break-word lh1rem">{{.NextHash}}</span>
+                        </td>
+                    </tr>
+                    {{else}}
+                    <tr>
+                        <td class="text-right pr-2 lh1rem vam nowrap"><a data-preserve-keynav-index="true" href="/block/{{.NextBlock}}">NEXT BLOCK</a></td>
+                        <td>
+                            <span class="hash break-word lh1rem">{{.NextBlock}}</span>
+                        </td>
+                    </tr>
+                    {{end}}
+                    <tr>
+                        <td class="text-right pr-2 lh1rem nowrap p03rem0">             </td>
+                        <td class="lh1rem"></td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="col-md-5 col-sm-6 d-flex">
+                <table class="">
+                    <tr>
+                        <td class="text-right lh1rem pr-2 xs-w117">TIME</td>
+                        <td class="lh1rem" style="min-width: 178px;">
+                            ({{timezone}}) {{.FormattedTime}} <span class="op60 fs12 nowrap">(<span data-target="main.age" data-age="{{.BlockTime}}"></span> ago)</span>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    {{end}}
+    </div>
+</div>
+
+{{ template "footer" . }}
+</body>
+</html>
+{{ end }}
